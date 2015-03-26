@@ -61,7 +61,7 @@ void core_cycle (Core *c)
 
   uns ifetch_delay=0, ld_delay=0, st_delay=0, bubble_cycles=0;
 	
-  ifetch_delay = memsys_access(c->memsys, c->trace_inst_addr, ACCESS_TYPE_IFETCH, c->core_id);
+  ifetch_delay = memsys_access(c->memsys, c->trace_inst_addr, c->trace_ldst_data, ACCESS_TYPE_IFETCH, c->core_id);
   if(ifetch_delay>1){
     bubble_cycles += (ifetch_delay-1);
   }
