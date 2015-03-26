@@ -67,14 +67,14 @@ void core_cycle (Core *c)
   }
 
   if(c->trace_inst_type==INST_TYPE_LOAD){
-    ld_delay = memsys_access(c->memsys, c->trace_ldst_addr, ACCESS_TYPE_LOAD, c->core_id);
+    ld_delay = memsys_access(c->memsys, c->trace_ldst_addr, c->trace_ldst_data, ACCESS_TYPE_LOAD, c->core_id);
   }
   if(ld_delay>1){
     bubble_cycles += (ld_delay-1);
   }
   
   if(c->trace_inst_type==INST_TYPE_STORE){
-    st_delay = memsys_access(c->memsys, c->trace_ldst_addr, ACCESS_TYPE_STORE, c->core_id);
+    st_delay = memsys_access(c->memsys, c->trace_ldst_addr, c->trace_ldst_data, ACCESS_TYPE_STORE, c->core_id);
   }
   //No bubbles for store misses
 
@@ -95,7 +95,9 @@ void core_read_trace (Core *c){
   tmp = fread (&c->trace_inst_addr, 4, 1, c->trace);
   tmp = fread (&c->trace_inst_type, 1, 1, c->trace);
   tmp = fread (&c->trace_ldst_addr, 4, 1, c->trace);
+  tmp = fread (&c->trace_ldst_data, 4, 1, c->trace);
   
+
   if(feof(c->trace)){
     c->done=TRUE;
     c->done_inst_count  = c->inst_count;

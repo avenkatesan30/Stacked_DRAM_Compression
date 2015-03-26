@@ -25,6 +25,7 @@ struct Core {
   uns64  trace_inst_addr;
   uns64  trace_inst_type;
   uns64  trace_ldst_addr;
+  uns64  trace_ldst_data;
   
   uns64 snooze_end_cycle; // when waiting for data to return
 

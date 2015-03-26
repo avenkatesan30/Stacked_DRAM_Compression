@@ -19,6 +19,7 @@ struct Cache_Line {
     Addr    tag;
     uns     core_id;
     uns    last_access_time; // for LRU
+    uns64  data;
    // Note: No data as we are only estimating hit/miss 
 };
 

@@ -38,14 +38,14 @@ Memsys *memsys_new(void)
 // This function takes an ifetch/ldst access and returns the delay
 ////////////////////////////////////////////////////////////////////
 
-uns64 memsys_access(Memsys *sys, Addr addr, Access_Type type, uns core_id)
+uns64 memsys_access(Memsys *sys, Addr addr, uns64 data, Access_Type type, uns core_id)
 {
   uns delay=0;
 
   // all cache transactions happen at line granularity, so get lineaddr
   Addr lineaddr=addr/CACHE_LINESIZE;
   
-  delay = memsys_access_modeA(sys,lineaddr,type,core_id);
+  delay = memsys_access_modeA(sys,lineaddr,data,type,core_id);
 
   //update the stats
   if(type==ACCESS_TYPE_IFETCH){
@@ -108,7 +108,7 @@ void memsys_print_stats(Memsys *sys)
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, Access_Type type, uns core_id){
+uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, uns64 data, Access_Type type, uns core_id){
   Flag needs_dcache_access=FALSE;
   Flag is_write=FALSE;
   
@@ -129,7 +129,7 @@ uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, Access_Type type, uns core
   if(needs_dcache_access){
     Flag outcome=cache_access(sys->dcache, lineaddr, is_write, core_id);
     if(outcome==MISS){
-      cache_install(sys->dcache, lineaddr, is_write, core_id);
+      cache_install(sys->dcache, lineaddr, data, is_write, core_id);
     }
   }
 

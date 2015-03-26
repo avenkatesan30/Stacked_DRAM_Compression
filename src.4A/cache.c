@@ -1,7 +1,9 @@
+#include "cache.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "cache.h"
+
 extern uns64 cycle; // You can use this as timestamp for LRU
 
 ////////////////////////////////////////////////////////////////////
@@ -114,13 +116,8 @@ Flag cache_read(Cache *c, Addr lineaddr)
 // copy victim into last_evicted_line for tracking writebacks
 ////////////////////////////////////////////////////////////////////
 
-void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
+void cache_install(Cache *c, Addr lineaddr, uns64 data, uns is_write, uns core_id){
 
-  // Your Code Goes Here
-  // Find victim using cache_find_victim
-  // Initialize the evicted entry
-  // Initialize the victime entry
-	
     int line_num   = lineaddr % c->num_sets;   /* cache index */
     Addr tag        = (Addr) lineaddr / c->num_sets;   /* cache tag */
 
@@ -132,18 +129,14 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
       if(c->sets[line_num].line[e_index].dirty) {
 
         // for a write-back cache, we have to insert a new memory request into the memory system 
-        // for this assignment, we will just drop this request 
-	 
+        // for this assignment, we will just drop this request
       }
-       
     }
-
     c->sets[line_num].line[e_index].tag   = tag;
+    c->sets[line_num].line[e_index].data = data;
     c->sets[line_num].line[e_index].last_access_time   = cycle;
     c->sets[line_num].line[e_index].valid = TRUE;
-    c->sets[line_num].line[e_index].dirty = FALSE;  // it should set a dirty bit correctly 
-
- 
+    c->sets[line_num].line[e_index].dirty = FALSE;  // it should set a dirty bit correctly
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -159,7 +152,6 @@ uns cache_find_victim(Cache *c, uns set_index, uns core_id){
 		  victim = ii;
 	  }
   }
-  
   return victim;
 }
 
