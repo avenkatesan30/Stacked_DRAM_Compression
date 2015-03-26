@@ -51,7 +51,7 @@ struct Cache{
 
 Cache  *cache_new(uns64 size, uns64 assocs, uns64 linesize, uns64 repl_policy);
 Flag    cache_access         (Cache *c, Addr lineaddr, uns is_write, uns core_id);
-void    cache_install        (Cache *c, Addr lineaddr, uns is_write, uns core_id);
+void    cache_install        (Cache *c, Addr lineaddr, uns64 data, uns is_write, uns core_id);
 void    cache_print_stats    (Cache *c, char *header);
 Flag    cache_read           (Cache *c, Addr lineaddr);
 uns     cache_find_victim    (Cache *c, uns set_index, uns core_id);

@@ -135,6 +135,8 @@ void print_dots(){
 
   last_printdot_cycle = cycle;
 
+
+
   if(!PRINT_DOTS){
       return;
   }
