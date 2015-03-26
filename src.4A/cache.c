@@ -1,10 +1,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-//Ajit Made this change
 #include "cache.h"
 extern uns64 cycle; // You can use this as timestamp for LRU
-//Abhi's change - 3
 ////////////////////////////////////////////////////////////////////
 // ------------- DO NOT MODIFY THE INIT FUNCTION -----------
 ////////////////////////////////////////////////////////////////////
