@@ -5,7 +5,7 @@
 #include <math.h>
 
 #include "memsys.h"
-
+#include "compression.h"
 
 //---- Cache Latencies  ------
 
@@ -22,6 +22,10 @@ extern uns64  DCACHE_ASSOC;
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
+int fpc_compress(char data[])
+{
+	return 14;
+}
 
 Memsys *memsys_new(void) 
 {
@@ -111,7 +115,7 @@ void memsys_print_stats(Memsys *sys)
 uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, char data[], Access_Type type, uns core_id){
   Flag needs_dcache_access=FALSE;
   Flag is_write=FALSE;
-  
+  int comp_data_size;
   if(type == ACCESS_TYPE_IFETCH){
     // no icache in this mode
   }
@@ -129,7 +133,9 @@ uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, char data[], Access_Type t
   if(needs_dcache_access){
     Flag outcome=cache_access(sys->dcache, lineaddr, is_write, core_id);
     if(outcome==MISS){
-      cache_install(sys->dcache, lineaddr, data, is_write, core_id);
+      comp_data_size = compress(data);
+      printf("%d\n",comp_data_size);
+      cache_install(sys->dcache, lineaddr, comp_data_size, is_write, core_id);
     }
   }
 

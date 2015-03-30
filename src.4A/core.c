@@ -98,7 +98,7 @@ void core_cycle (Core *c)
 ////////////////////////////////////////////////////////////////////
 
 void core_read_trace (Core *c){
-    int iter;
+    //int iter;
 	fread (&(rec.inst_num), 8, 1, infile);//inst_num
 	fread (&(rec.va), 8, 1, infile);//va
 	fread (&(rec.iswb), 1, 1, infile);//iswb
@@ -109,10 +109,10 @@ void core_read_trace (Core *c){
     c->trace_ldst_addr = rec.va;
     c->trace_inst_type = rec.iswb;
     memcpy(c->trace_ldst_data,rec.newdata,64);
-    printf("\n%d\t",c->trace_inst_type);
-    printf("%llu\t",c->trace_ldst_addr);
-    for(iter = 0; iter<64; iter++)
-    printf("%02x",c->trace_ldst_data[iter]);
+    //printf("\n%d\t",c->trace_inst_type);
+    //printf("%llu\t",c->trace_ldst_addr);
+    //for(iter = 0; iter<64; iter++)
+    //printf("%02x",c->trace_ldst_data[iter]);
 
     //flag++;
     //if(flag==100)
