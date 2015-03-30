@@ -4,6 +4,7 @@
 #include "types.h"
 #include "cache.h"
 
+
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 
@@ -30,8 +31,8 @@ struct Memsys {
 Memsys *memsys_new();
 void    memsys_print_stats(Memsys *sys);
 
-uns64   memsys_access(Memsys *sys, Addr addr, uns64 data, Access_Type type, uns core_id);
-uns64   memsys_access_modeA(Memsys *sys, Addr lineaddr, uns64 data, Access_Type type, uns core_id);
+uns64   memsys_access(Memsys *sys, Addr addr, char data[], Access_Type type, uns core_id);
+uns64   memsys_access_modeA(Memsys *sys, Addr lineaddr, char data[], Access_Type type, uns core_id);
 
 
 

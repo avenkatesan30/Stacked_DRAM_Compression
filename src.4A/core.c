@@ -4,14 +4,16 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <math.h>
+#include <zlib.h>
 
 #include "core.h"
-
+FILE *infile;
 extern uns64 cycle;
 
 extern void die_message(const char * msg);
-
-
+int flag = 0;
+FTR_Record rec;
+FTR_Record *ptr;
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
@@ -33,14 +35,19 @@ Core *core_new(Memsys *memsys, char *trace_fname, uns core_id)
 ////////////////////////////////////////////////////////////////////
 void core_init_trace(Core *c)
 {
-  char  command_string[512];
-  
-  sprintf(command_string,"gunzip -c %s", c->trace_fname);
-  if ((c->trace = popen(command_string, "r")) == NULL){
-    printf("Command string is %s\n", command_string);
-    die_message("Unable to open the file with gzip option \n");
+
+  char cmdline[1024];
+  sprintf(cmdline, "gunzip -c %s", c->trace_fname);
+  infile = popen(cmdline, "r");
+  if(!infile) {
+   printf("Cannot open %s: \n", c->trace_fname);
+   exit(1);
   }
-  
+  /*sprintf(command_string,"%s", c->trace_fname);
+  if ((c->trace = gzopen(command_string, "r")) == NULL){
+    printf("Command string is %s\n", command_string);
+    die_message("Unable to open the file with gzip option \n");*/
+  //}
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -66,14 +73,14 @@ void core_cycle (Core *c)
     bubble_cycles += (ifetch_delay-1);
   }
 
-  if(c->trace_inst_type==INST_TYPE_LOAD){
+  if((uns64)(c->trace_inst_type) + 1==INST_TYPE_LOAD){
     ld_delay = memsys_access(c->memsys, c->trace_ldst_addr, c->trace_ldst_data, ACCESS_TYPE_LOAD, c->core_id);
   }
   if(ld_delay>1){
     bubble_cycles += (ld_delay-1);
   }
   
-  if(c->trace_inst_type==INST_TYPE_STORE){
+  if((uns64)(c->trace_inst_type) + 1==INST_TYPE_STORE){
     st_delay = memsys_access(c->memsys, c->trace_ldst_addr, c->trace_ldst_data, ACCESS_TYPE_STORE, c->core_id);
   }
   //No bubbles for store misses
@@ -91,19 +98,48 @@ void core_cycle (Core *c)
 ////////////////////////////////////////////////////////////////////
 
 void core_read_trace (Core *c){
-  uns tmp;
-  tmp = fread (&c->trace_inst_addr, 4, 1, c->trace);
-  tmp = fread (&c->trace_inst_type, 1, 1, c->trace);
-  tmp = fread (&c->trace_ldst_addr, 4, 1, c->trace);
-  tmp = fread (&c->trace_ldst_data, 4, 1, c->trace);
-  
+    int iter;
+	fread (&(rec.inst_num), 8, 1, infile);//inst_num
+	fread (&(rec.va), 8, 1, infile);//va
+	fread (&(rec.iswb), 1, 1, infile);//iswb
+	fread (&(rec.delay), 4, 1, infile);//delay
+	fread (&(rec.olddata), 64, 1, infile);//olddata
+	fread (&(rec.newdata), 64, 1, infile);//newdata
 
-  if(feof(c->trace)){
+    c->trace_ldst_addr = rec.va;
+    c->trace_inst_type = rec.iswb;
+    memcpy(c->trace_ldst_data,rec.newdata,64);
+    printf("\n%d\t",c->trace_inst_type);
+    printf("%llu\t",c->trace_ldst_addr);
+    for(iter = 0; iter<64; iter++)
+    printf("%02x",c->trace_ldst_data[iter]);
+
+    //flag++;
+    //if(flag==100)
+    	//exit(0);
+	/*int iter;
+  gzread(c->trace, &buf, sizeof(FTR_Record));
+  ptr = &buf;
+  memcpy(&(c->trace_ldst_addr),&(ptr->va),64);
+  memcpy(&(c->trace_inst_type),&(ptr->iswb),sizeof(bool));
+  //c->trace_inst_type = ptr->iswb;
+  memcpy(c->trace_ldst_data,ptr->newdata,64);
+  //printf("%llu\t",c->trace_inst_addr);
+  printf("\n%d\t",c->trace_inst_type);
+  printf("%llu\t",c->trace_ldst_addr);
+  for(iter = 0; iter<64; iter++)
+  printf("%02x",ptr->newdata[iter]);
+  flag ++;
+  if(flag == 50)
+  exit(0);
+  */
+  //printf("\n");
+  if(feof(infile)){
     c->done=TRUE;
     c->done_inst_count  = c->inst_count;
     c->done_cycle_count = cycle;
   }
-  
+  //ptr++;
 }
 
 ////////////////////////////////////////////////////////////
@@ -120,7 +156,7 @@ void core_print_stats(Core *c)
   printf("\n%s_CYCLES       \t\t : %10llu", header,  c->done_cycle_count);
   printf("\n%s_IPC          \t\t : %10.3f", header,  ipc);
 
-  pclose(c->trace);
+  pclose(infile);
 }
 
 

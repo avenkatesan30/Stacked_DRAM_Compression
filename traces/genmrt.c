@@ -13,9 +13,9 @@ void dump_trace(uint32_t iaddr, uint32_t type, uint32_t vaddr);
 int main (int argc, char **argv) {
   int ii, iterid;
   char command_string2[1024];
-  sprintf(command_string2,"gzip -f > %s", "out.mtr.gz");
-  outfile = popen(command_string2, "w"); 
-  printf("%s opened for writing trace\n", "out.mtr.gz");
+  sprintf(command_string2,"%s", "out.trace.gz");
+  outfile = gzopen(command_string2, "w");
+  printf("%s opened for writing trace\n", "out.trace.gz");
 
   for(iterid=0; iterid < 100 ; iterid++){
     for(ii=0; ii< 33; ii++){
@@ -34,7 +34,7 @@ int main (int argc, char **argv) {
 void dump_trace(uint32_t iaddr, uint32_t type, uint32_t vaddr){
   
   outfile_traces++;
-  fwrite (&iaddr, 4, 1, outfile);
-  fwrite (&type, 1, 1, outfile);
-  fwrite (&vaddr, 4, 1, outfile);
+  gzwrite (outfile,&iaddr, 4);
+  gzwrite (outfile,&type, 1);
+  gzwrite (outfile,&vaddr, 4);
 }

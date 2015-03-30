@@ -116,7 +116,7 @@ Flag cache_read(Cache *c, Addr lineaddr)
 // copy victim into last_evicted_line for tracking writebacks
 ////////////////////////////////////////////////////////////////////
 
-void cache_install(Cache *c, Addr lineaddr, uns64 data, uns is_write, uns core_id){
+void cache_install(Cache *c, Addr lineaddr, char data[], uns is_write, uns core_id){
 
     int line_num   = lineaddr % c->num_sets;   /* cache index */
     Addr tag        = (Addr) lineaddr / c->num_sets;   /* cache tag */
@@ -133,7 +133,7 @@ void cache_install(Cache *c, Addr lineaddr, uns64 data, uns is_write, uns core_i
       }
     }
     c->sets[line_num].line[e_index].tag   = tag;
-    c->sets[line_num].line[e_index].data = data;
+    memcpy(c->sets[line_num].line[e_index].data,data,64);
     c->sets[line_num].line[e_index].last_access_time   = cycle;
     c->sets[line_num].line[e_index].valid = TRUE;
     c->sets[line_num].line[e_index].dirty = FALSE;  // it should set a dirty bit correctly
