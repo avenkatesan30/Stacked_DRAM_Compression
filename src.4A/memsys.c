@@ -22,10 +22,10 @@ extern uns64  DCACHE_ASSOC;
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-int fpc_compress(char data[])
+/*int fpc_compress(char data[])
 {
 	return 14;
-}
+}*/
 
 Memsys *memsys_new(void) 
 {
@@ -134,7 +134,7 @@ uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, char data[], Access_Type t
     Flag outcome=cache_access(sys->dcache, lineaddr, is_write, core_id);
     if(outcome==MISS){
       comp_data_size = compress(data);
-      printf("%d\n",comp_data_size);
+      //printf("%d\n",comp_data_size);
       cache_install(sys->dcache, lineaddr, comp_data_size, is_write, core_id);
     }
   }

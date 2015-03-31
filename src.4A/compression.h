@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 
 uint32_t upper_28f_int=0xFFFFFFF0;
 uint32_t upper_280_int = 0x00000000;
@@ -48,16 +49,17 @@ int FPC(char *data_segment){
 		std::cout<<(int)data_segment[i]<<"\t";
 
 	std::cout<<"Best Size"<<best_size<<"\n";*/
+
 	return best_size;
-
-
 }
-
 int compress(char *data){
 	float sum=0;
 	for(int i=0;i<16;i++){
-		sum+=FPC(data+(i*4))+3;
+		sum+=FPC(data+(i*4));
 	}
-	return (ceil(sum/8));
+	sum=ceil(sum/8);
+	double next = pow(2, ceil(log(sum)/log(2)));
+	//printf("%d \n",(int)next);
+	return (int)next;
 }
 

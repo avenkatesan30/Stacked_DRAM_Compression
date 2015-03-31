@@ -245,7 +245,7 @@ int count_nums(Cache *c, uns set_index, int num)
 uns get_comb_victim(Cache *c, int comp_data_size, uns set_index)
 {
   uns victim;
-  if(comp_data_size == 38)
+  if(comp_data_size == 32)
   {
 	//printf("\nHi");
     int num_eights = count_nums(c,set_index,8);
