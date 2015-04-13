@@ -51,7 +51,8 @@ void    cache_print_stats    (Cache *c, char *header){
   printf("\n%s_TOTAL_MISSES   \t\t : %10llu", header, c->stat_write_miss + c->stat_read_miss);
   printf("\n%s_READ_MISSPERC  \t\t : %10.3f", header, 100*read_mr);
   printf("\n%s_WRITE_MISSPERC \t\t : %10.3f", header, 100*write_mr);
-  printf("\n%s_TOTAL_MISSPERC \t\t : %10.3f", header, 100*read_mr + 100*write_mr);
+  printf("\n%s_TOTAL_MISS_RATE \t\t : %10.3f", header, (double)(c->stat_write_miss + c->stat_read_miss)/(double)(c->stat_read_access+c->stat_write_access)*100);
+  printf("\n%s_TOTAL_HIT_RATE \t\t : %10.3f", header, 100 - (double)(c->stat_write_miss + c->stat_read_miss)/(double)(c->stat_read_access+c->stat_write_access)*100);
   printf("\n%s_DIRTY_EVICTS   \t\t : %10llu", header, c->stat_dirty_evicts);//???
 
   printf("\n");
@@ -67,16 +68,18 @@ void    cache_print_stats    (Cache *c, char *header){
 Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   Flag outcome=MISS;
   outcome = cache_read(c,lineaddr);
+  //if(cycle>=6425700 && cycle<=6425800)
+  //printf("--Access %d\n",outcome);
   if(is_write == 1)
   {
     c->stat_write_access++;
-    if(outcome == FALSE)
+    if(outcome == MISS)
      c->stat_write_miss++;
   } 
   else
   {
     c->stat_read_access++;
-    if(outcome == FALSE)
+    if(outcome == MISS)
      c->stat_read_miss++;
   }
   return outcome;
@@ -89,14 +92,27 @@ Flag cache_read(Cache *c, Addr lineaddr)
   int line_num   = lineaddr % c->num_sets;   /* cache index */
   Addr tag        = (Addr) lineaddr / c->num_sets;   /* cache tag */
   int cache_cold = FALSE;
-  /* set associative */ 
+ /* if(cycle>=6425700 && cycle<=6425800)
+  {
+   set associative 
     for(jj=0;jj<5;jj++)
     {
+    	printf("%llu-%d-%d\t",c->sets[line_num].line[0].comp_cl[jj].tag,c->sets[line_num].line[0].comp_cl[jj].valid,c->sets[line_num].line[0].size_occupied);
+    }
+    printf("   ---  incoming tag - %llu ---Line number-%d",tag,line_num);
+  }*/
+    for(jj=0;jj<5;jj++)
+    {
+    	   
            if(c->sets[line_num].line[0].comp_cl[jj].tag == tag)
            {   // tag match
+        	   //printf("\nTag match");
               if(c->sets[line_num].line[0].comp_cl[jj].valid == FALSE)
               {
+            	  //printf("\ncache is cold");
                 // data should be valid
+            	  if(jj<4)
+            	  continue;
                    cache_cold = TRUE;
                    match_index = jj;
               }
@@ -119,13 +135,16 @@ Flag cache_read(Cache *c, Addr lineaddr)
 
 void cache_install(Cache *c, Addr lineaddr, int comp_data_size, uns is_write, uns core_id)
 {
+  //printf("%d",comp_data_size);
+  //printf("\n");
   int line_num   = lineaddr % c->num_sets;   /* cache index */
   Addr tag        = (Addr) lineaddr / c->num_sets;   /* cache tag */
   uns e_index = 0;
   int jj,size = 0;
   //if incoming cache line's compressed size can be fit in without exceeding the limit - just directly install
-    if(comp_data_size <= line_size - c->sets[line_num].line[0].size_occupied)
+    if((comp_data_size + 6) <= line_size - c->sets[line_num].line[0].size_occupied)
     {
+    	  //printf("\nInside");
           for(jj=0;jj<5;jj++)
           {
            if(c->sets[line_num].line[0].comp_cl[jj].valid == 0)
@@ -148,7 +167,7 @@ void cache_install(Cache *c, Addr lineaddr, int comp_data_size, uns is_write, un
   {
 	  if(c->sets[line_num].line[0].comp_cl[jj].valid)
 	  {
-		 size += c->sets[line_num].line[0].comp_cl[jj].compressed_size;
+		 size += c->sets[line_num].line[0].comp_cl[jj].compressed_size + 6;
 	  }
   }
   c->sets[line_num].line[0].size_occupied = size;
@@ -294,6 +313,7 @@ uns get_comb_victim(Cache *c, int comp_data_size, uns set_index)
 
 uns cache_find_victim(Cache *c, uns set_index, int comp_data_size, uns core_id)
 {
+  
   //printf("%d\n",comp_data_size);
   uns victim=0;
   int jj,flag = 0;
@@ -304,14 +324,31 @@ uns cache_find_victim(Cache *c, uns set_index, int comp_data_size, uns core_id)
     if(c->sets[set_index].line[0].comp_cl[jj].valid && c->sets[set_index].line[0].comp_cl[jj].compressed_size>=comp_data_size)
     {
       replacement_candidates[ind]=jj;
+     // printf("%d-%u-  \t",jj, c->sets[set_index].line[0].comp_cl[jj].last_access_time);
       ind++;
       flag = 1;
     }
+    
   }
+  
   if(!flag)
-    victim = get_comb_victim(c,comp_data_size,set_index);
+  {
+	//printf("\nCalling comb victim");
+    //OLD CODE//
+	  victim = get_comb_victim(c,comp_data_size,set_index);
+    ///////////
+	  //uns temp_arr[5]={0,1,2,3,4};
+	    //victim = lru_repl(c, temp_arr, 5, set_index);
+	    //printf("%d\n",victim);
+	 
+  }
   else
+  {
+    //printf("\nCalling lru victim");
     victim = lru_repl(c, replacement_candidates, ind, set_index);
+    //printf("%d\n",victim);
+  }
+  //printf("\n");
   return victim;
 }
 

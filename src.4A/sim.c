@@ -26,7 +26,7 @@ MODE        SIM_MODE        = SIM_MODE_A;
 uns64       CACHE_LINESIZE  = 70;
 uns64       REPL_POLICY     = 0; // 0:LRU 1:RAND
 
-uns64       DCACHE_SIZE     = 2 * 1024;
+uns64       DCACHE_SIZE     = 16 * 1024 * 1024;
 uns64       DCACHE_ASSOC    = 1;
 
 uns64       ICACHE_SIZE     = 32*1024; 

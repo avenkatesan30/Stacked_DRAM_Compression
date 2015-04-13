@@ -47,7 +47,6 @@ int FPC(char *data_segment){
 	/*std::cout<<"DATA:\t";
 	for(int i=0;i<4;i++)
 		std::cout<<(int)data_segment[i]<<"\t";
-
 	std::cout<<"Best Size"<<best_size<<"\n";*/
 
 	return best_size;

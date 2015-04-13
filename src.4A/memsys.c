@@ -47,7 +47,7 @@ uns64 memsys_access(Memsys *sys, Addr addr, char data[], Access_Type type, uns c
   uns delay=0;
 
   // all cache transactions happen at line granularity, so get lineaddr
-  Addr lineaddr=addr/CACHE_LINESIZE;
+  Addr lineaddr=addr;/*/CACHE_LINESIZE;*/
   
   delay = memsys_access_modeA(sys,lineaddr,data,type,core_id);
 
