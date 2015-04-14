@@ -298,7 +298,7 @@ uns get_comb_victim(Cache *c, int comp_data_size, uns set_index)
 		victim = evict_everything(c,set_index,16);
 		num_eights = count_nums(c,set_index,8);
 		//Retain just one 8 and evict everything else - evict (n-1) 8's
-		victim = evict(c,set_index,8,num_eights-1);
+		if(num_eights>1) victim = evict(c,set_index,8,num_eights-1);
 	}
 	else if(comp_data_size == 40)
 	{
@@ -319,11 +319,13 @@ uns get_comb_victim(Cache *c, int comp_data_size, uns set_index)
 			{
 				//evict the 16 and m-1 LRU 8's
 				victim = evict(c,set_index,16,1);
-				victim = evict(c,set_index,8,num_eights-1);
+				if(num_eights>1) victim = evict(c,set_index,8,num_eights-1);
 			}
 		}
 		else //Evict m-1 LRU 8's
-			victim = evict(c,set_index,8,num_eights-1);
+		{
+			if(num_eights>1)	victim = evict(c,set_index,8,num_eights-1);
+		}
 	}
 	else if(comp_data_size == 32)
 	{
@@ -352,7 +354,9 @@ uns get_comb_victim(Cache *c, int comp_data_size, uns set_index)
 					victim = evict(c,set_index,8,1);
 			}
 			else //evict r-2 8's
-				victim = evict(c,set_index,8,num_eights-2);
+			{
+				if(num_eights>2) victim = evict(c,set_index,8,num_eights-2);
+			}
 		}
 	}
 	else if(comp_data_size == 24)
@@ -369,7 +373,9 @@ uns get_comb_victim(Cache *c, int comp_data_size, uns set_index)
 				victim = evict(c,set_index,8,1);
 		}
 		else //evict r-2 8's
-		   victim = evict(c,set_index,8,num_eights-2);
+		{
+			if(num_eights>2) victim = evict(c,set_index,8,num_eights-2);
+		}
 	}
 	else //comp_data_size == 16
 	{
