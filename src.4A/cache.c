@@ -6,6 +6,10 @@
 
 extern uns64 cycle; // You can use this as timestamp for LRU
 #define line_size 70
+#define DCACHE_DECOMPRESSION_LATENCY 5
+#define DCACHE_HIT_LATENCY   42
+#define DCACHE_MISS_LATENCY  100
+
 
 ////////////////////////////////////////////////////////////////////
 // ------------- DO NOT MODIFY THE INIT FUNCTION -----------
@@ -68,6 +72,10 @@ void    cache_print_stats    (Cache *c, char *header){
 Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   Flag outcome=MISS;
   outcome = cache_read(c,lineaddr);
+  if(outcome == HIT)
+	  cycle += DCACHE_HIT_LATENCY;
+  else
+	  cycle += DCACHE_MISS_LATENCY;
   //if(cycle>=6425700 && cycle<=6425800)
   //printf("--Access %d\n",outcome);
   if(is_write == 1)
@@ -119,6 +127,8 @@ Flag cache_read(Cache *c, Addr lineaddr)
               if(!cache_cold)
               {
                   c->sets[line_num].line[jj].comp_cl[match_index].last_access_time = cycle;    // update lru time
+                  if(c->sets[line_num].line[jj].comp_cl[match_index].compressed_size < 64) //hit for a compressed line
+                	  cycle += DCACHE_DECOMPRESSION_LATENCY;
                   return HIT;
               }
               else return MISS; // cache block was empty so we don't need to evict cache block
@@ -200,6 +210,21 @@ uns lru_repl(Cache *c, uns replacement_candidates[], int size, uns set_index)
     return victim;
 }
 
+uns evict_everything(Cache *c, uns set_index, int num)//evicts every entry which has comp_data_size >= num
+{
+	uns victim = 0;
+	int ii;
+	for(ii=0;ii<5;ii++)
+	{
+		if(c->sets[set_index].line[0].comp_cl[ii].valid && c->sets[set_index].line[0].comp_cl[ii].compressed_size >= num)
+		{
+			c->sets[set_index].line[0].comp_cl[ii].valid = 0;
+			victim = ii;
+		}
+	}
+	return victim;
+}
+
 uns evict(Cache *c, uns set_index, int num, int count)
 {
    uns victim = 0;
@@ -263,51 +288,96 @@ int count_nums(Cache *c, uns set_index, int num)
 
 uns get_comb_victim(Cache *c, int comp_data_size, uns set_index)
 {
-  uns victim;
-  if(comp_data_size == 32)
-  {
-	//printf("\nHi");
-    int num_eights = count_nums(c,set_index,8);
-    if(num_eights == 5 || num_eights == 4)
-           victim = evict(c,set_index,8,4); //evict 4 best 8s
-    else if(num_eights == 3)
-    {
-      if(count_nums(c,set_index,16) == 0)
-         victim = evict(c,set_index,8,3); //evict 3 8s
-      else
-      {
-        victim = evict(c,set_index,16,1);
-        victim = evict(c,set_index,8,2);
-      }
-    }
-    else if(num_eights == 2)
-      victim = evict(c,set_index,16,1);
-    else if(num_eights == 1)
-    {
-      if(!lru_compute(c,set_index,8))
-      {
-        victim = evict(c,set_index,8,1);
-          victim = evict(c,set_index,16,1);
-      }
-        else
-      victim = evict(c,set_index,16,2);
-    }
-    else
-    {
-      if(count_nums(c,set_index,16)==3)
-          victim = evict(c,set_index,16,2);
-      else
-        victim = evict(c,set_index,16,1);
-    }
-  }
-  else //comp_data_size = 16
-  {
-	//printf("\nHello");
-    if(count_nums(c,set_index,8)==4)
-      victim = evict(c,set_index,8,1);
-    else
-      victim = evict(c,set_index,8,2);
-  }
+	uns victim;
+	int num_eights,num_sixteens,num_24s;
+	if(comp_data_size == 64 || comp_data_size == 56)
+	   victim = evict_everything(c,set_index,8); //evict everything that has compressed size greater than or equal to 8
+	else if(comp_data_size == 48) //can co-exist with only a single 8
+	{
+		//evict everything that is not an 8
+		victim = evict_everything(c,set_index,16);
+		num_eights = count_nums(c,set_index,8);
+		//Retain just one 8 and evict everything else - evict (n-1) 8's
+		victim = evict(c,set_index,8,num_eights-1);
+	}
+	else if(comp_data_size == 40)
+	{
+		//Evict everything other than 16 and 8
+		victim = evict_everything(c,set_index,24);
+		num_sixteens = count_nums(c,set_index,16);
+		num_eights = count_nums(c,set_index,8);
+		if(num_sixteens > 1)
+		{
+			if(num_eights == 0)
+			  victim = evict(c,set_index,16,num_sixteens-1);
+			else
+			   victim = evict(c,set_index,16,num_sixteens);
+		}
+		else if(num_sixteens == 1)
+		{
+			if(num_eights!=0)
+			{
+				//evict the 16 and m-1 LRU 8's
+				victim = evict(c,set_index,16,1);
+				victim = evict(c,set_index,8,num_eights-1);
+			}
+		}
+		else //Evict m-1 LRU 8's
+			victim = evict(c,set_index,8,num_eights-1);
+	}
+	else if(comp_data_size == 32)
+	{
+	    //can co-exist with one 8, two 8s, one 16, one 24
+		num_24s = count_nums(c,set_index,24);
+		num_sixteens = count_nums(c,set_index,16);
+		num_eights = count_nums(c,set_index,8);
+		if(num_24s == 2) //evict LRU 24
+			victim = evict(c,set_index,24,1);
+		else if(num_24s == 1)
+		{
+			//evict 24
+			victim = evict(c,set_index,24,1);
+			if(num_sixteens == 1 && num_eights == 1) //evict 16
+				victim = evict(c,set_index,16,1);
+		}
+		else
+		{
+			if(num_sixteens == 3 || num_sixteens == 2) //evict 2 LRU 16s
+			    victim = evict(c,set_index,16,2);
+			else if(num_sixteens == 1)
+			{
+				//evict the 16
+				victim = evict(c,set_index,16,1);
+				if(num_eights == 3) //evict one 8
+					victim = evict(c,set_index,8,1);
+			}
+			else //evict r-2 8's
+				victim = evict(c,set_index,8,num_eights-2);
+		}
+	}
+	else if(comp_data_size == 24)
+	{
+		num_sixteens = count_nums(c,set_index,16);
+		num_eights = count_nums(c,set_index,8);
+		if(num_sixteens > 1) //evict n-1 16s
+			victim = evict(c,set_index,16,num_sixteens-1);
+		else if(num_sixteens == 1)
+		{
+			//evict the 16
+			victim = evict(c,set_index,16,1);
+			if(num_eights == 3) //evict one 8
+				victim = evict(c,set_index,8,1);
+		}
+		else //evict r-2 8's
+		   victim = evict(c,set_index,8,num_eights-2);
+	}
+	else //comp_data_size == 16
+	{
+		if(count_nums(c,set_index,8)==4)
+		      victim = evict(c,set_index,8,1);
+		else
+		      victim = evict(c,set_index,8,2);
+	}
   return victim;
 }
 

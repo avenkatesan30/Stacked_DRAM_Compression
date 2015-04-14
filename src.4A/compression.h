@@ -57,8 +57,10 @@ int compress(char *data){
 		sum+=FPC(data+(i*4));
 	}
 	sum=ceil(sum/8);
-	double next = pow(2, ceil(log(sum)/log(2)));
-	//printf("%d \n",(int)next);
-	return (int)next;
+	int k = sum;
+	if(k%8 == 0)
+		return k;
+	else
+		return (int)((k/8)+1)*8;
 }
 
