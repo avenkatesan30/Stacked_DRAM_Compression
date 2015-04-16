@@ -8,7 +8,7 @@ extern uns64 cycle; // You can use this as timestamp for LRU
 #define line_size 70
 #define DCACHE_DECOMPRESSION_LATENCY 5
 #define DCACHE_HIT_LATENCY   42
-#define DCACHE_MISS_LATENCY  100
+#define DCACHE_MISS_LATENCY  200
 
 
 ////////////////////////////////////////////////////////////////////
@@ -96,7 +96,7 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 Flag cache_read(Cache *c, Addr lineaddr)
 {   
   uns64 jj;
-  int match_index;
+  int match_index = 0;
   int line_num   = lineaddr % c->num_sets;   /* cache index */
   Addr tag        = (Addr) lineaddr / c->num_sets;   /* cache tag */
   int cache_cold = FALSE;
@@ -288,7 +288,7 @@ int count_nums(Cache *c, uns set_index, int num)
 
 uns get_comb_victim(Cache *c, int comp_data_size, uns set_index)
 {
-	uns victim;
+	uns victim = 0;
 	int num_eights,num_sixteens,num_24s;
 	if(comp_data_size == 64 || comp_data_size == 56)
 	   victim = evict_everything(c,set_index,8); //evict everything that has compressed size greater than or equal to 8

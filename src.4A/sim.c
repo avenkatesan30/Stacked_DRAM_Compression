@@ -10,7 +10,6 @@
 #include <string.h>
 #include <inttypes.h>
 #include <assert.h>
-
 #include "types.h"
 #include "memsys.h"
 #include "core.h"

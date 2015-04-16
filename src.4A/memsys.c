@@ -104,8 +104,6 @@ void memsys_print_stats(Memsys *sys)
   printf("\n");
 
   cache_print_stats(sys->dcache, "DCACHE");
-
-
 }
 
 

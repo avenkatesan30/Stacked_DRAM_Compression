@@ -5,7 +5,6 @@
 #include <inttypes.h>
 #include <math.h>
 #include <zlib.h>
-
 #include "core.h"
 FILE *infile;
 extern uns64 cycle;

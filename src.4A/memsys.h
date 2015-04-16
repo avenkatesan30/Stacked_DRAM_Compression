@@ -13,7 +13,6 @@ typedef struct Memsys   Memsys;
 struct Memsys {
   Cache *dcache;  
 
-
    // stats 
   uns64 stat_ifetch_access;
   uns64 stat_load_access;

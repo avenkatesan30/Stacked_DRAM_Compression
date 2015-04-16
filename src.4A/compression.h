@@ -9,8 +9,6 @@ uint32_t upper_280_int = 0x00000000;
 char *upper_280=(char*)  (&upper_280_int);
 char *upper_28f= (char*) (&upper_28f_int);
 
-
-
 int FPC(char *data_segment){
 	
 	int best_size=32;
