@@ -63,6 +63,7 @@ void    cache_install        (Cache *c, Addr lineaddr, int comp_data_size, uns i
 void    cache_print_stats    (Cache *c, char *header);
 Flag    cache_read           (Cache *c, Addr lineaddr);
 uns cache_find_victim        (Cache *c, uns set_index, int comp_data_size, uns core_id);
+int lru_compute(Cache *c, uns set_index, Addr tag);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

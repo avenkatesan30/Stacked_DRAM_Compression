@@ -10,14 +10,15 @@
 //---- Cache Latencies  ------
 
 #define DCACHE_HIT_LATENCY   1
-#define DCACHE_MISS_LATENCY  100
+#define DCACHE_MISS_LATENCY  200
 
 extern MODE   SIM_MODE;
 extern uns64  CACHE_LINESIZE;
 extern uns64  REPL_POLICY;
-
 extern uns64  DCACHE_SIZE; 
 extern uns64  DCACHE_ASSOC; 
+extern long long int GCP;
+long long int GCP = 0;
 
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
@@ -131,7 +132,18 @@ uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, char data[], Access_Type t
   if(needs_dcache_access){
     Flag outcome=cache_access(sys->dcache, lineaddr, is_write, core_id);
     if(outcome==MISS){
-      comp_data_size = compress(data);
+    	//printf("\n GCP = %lld",GCP);
+    	if(GCP>=0)
+    	{
+    		//printf("Yay!  ---   Compressing!\n");
+    		comp_data_size = compress(data);
+    	}
+    	else
+    	{
+    		//printf("Not compressing!\n");
+    		//comp_data_size = compress(data);
+    		comp_data_size=64;
+    	}
       //printf("%d\n",comp_data_size);
       cache_install(sys->dcache, lineaddr, comp_data_size, is_write, core_id);
     }

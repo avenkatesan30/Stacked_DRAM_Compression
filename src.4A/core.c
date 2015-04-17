@@ -8,7 +8,8 @@
 #include "core.h"
 FILE *infile;
 extern uns64 cycle;
-
+extern uns64 inst_id;
+uns64 inst_id=1;
 extern void die_message(const char * msg);
 int flag = 0;
 FTR_Record rec;
@@ -104,7 +105,7 @@ void core_read_trace (Core *c){
 	fread (&(rec.delay), 4, 1, infile);//delay
 	fread (&(rec.olddata), 64, 1, infile);//olddata
 	fread (&(rec.newdata), 64, 1, infile);//newdata
-
+	inst_id++;
     c->trace_ldst_addr = rec.va;
     c->trace_inst_type = rec.iswb;
     for(iter=0;iter<64;iter++)
@@ -155,7 +156,7 @@ void core_print_stats(Core *c)
   printf("\n");
   printf("\n%s_INST         \t\t : %10llu", header,  c->done_inst_count);
   printf("\n%s_CYCLES       \t\t : %10llu", header,  c->done_cycle_count);
-  printf("\n%s_IPC          \t\t : %10.3f", header,  ipc);
+  printf("\n%s_IPC          \t\t : %f", header,  ipc);
 
   pclose(infile);
 }

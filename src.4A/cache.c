@@ -3,14 +3,23 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+extern uns64 inst_id;
 extern uns64 cycle; // You can use this as timestamp for LRU
 #define line_size 70
 #define DCACHE_DECOMPRESSION_LATENCY 5
 #define DCACHE_HIT_LATENCY   42
 #define DCACHE_MISS_LATENCY  200
-
-
+long long int THRESHOLD = 262000;
+long long int GCP;
+double hit_rate_1=1.0;
+double hit_rate_2=1.0;
+uns64 hit_count_1=1;
+uns64 hit_count_2=1;
+double miss_rate=1.0;
+uns64 miss_count=1;
+uns64 sim_inst_count=0;
+uns64 compression_count=0;
+uns64 dontcompress_count=0;
 ////////////////////////////////////////////////////////////////////
 // ------------- DO NOT MODIFY THE INIT FUNCTION -----------
 ////////////////////////////////////////////////////////////////////
@@ -58,7 +67,8 @@ void    cache_print_stats    (Cache *c, char *header){
   printf("\n%s_TOTAL_MISS_RATE \t\t : %10.3f", header, (double)(c->stat_write_miss + c->stat_read_miss)/(double)(c->stat_read_access+c->stat_write_access)*100);
   printf("\n%s_TOTAL_HIT_RATE \t\t : %10.3f", header, 100 - (double)(c->stat_write_miss + c->stat_read_miss)/(double)(c->stat_read_access+c->stat_write_access)*100);
   printf("\n%s_DIRTY_EVICTS   \t\t : %10llu", header, c->stat_dirty_evicts);//???
-
+  printf("\n INST ID %llu ",inst_id);
+  printf("\nCompression Count %llu- - - - - Dont Compress Count %llu ",compression_count,dontcompress_count);
   printf("\n");
 }
 
@@ -73,10 +83,14 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   Flag outcome=MISS;
   outcome = cache_read(c,lineaddr);
   if(outcome == HIT)
+  {
 	  cycle += DCACHE_HIT_LATENCY;
+  }
   else
+  {
 	  cycle += DCACHE_MISS_LATENCY;
-  //if(cycle>=6425700 && cycle<=6425800)
+  }
+  //if(inst_id>=20000 && inst_id<=20150)
   //printf("--Access %d\n",outcome);
   if(is_write == 1)
   {
@@ -100,9 +114,9 @@ Flag cache_read(Cache *c, Addr lineaddr)
   int line_num   = lineaddr % c->num_sets;   /* cache index */
   Addr tag        = (Addr) lineaddr / c->num_sets;   /* cache tag */
   int cache_cold = FALSE;
- /* if(cycle>=6425700 && cycle<=6425800)
+  /*if(inst_id>=20000 && inst_id<=20150)
   {
-   set associative 
+   //set associative
     for(jj=0;jj<5;jj++)
     {
     	printf("%llu-%d-%d\t",c->sets[line_num].line[0].comp_cl[jj].tag,c->sets[line_num].line[0].comp_cl[jj].valid,c->sets[line_num].line[0].size_occupied);
@@ -126,13 +140,50 @@ Flag cache_read(Cache *c, Addr lineaddr)
               }
               if(!cache_cold)
               {
-                  c->sets[line_num].line[jj].comp_cl[match_index].last_access_time = cycle;    // update lru time
-                  if(c->sets[line_num].line[jj].comp_cl[match_index].compressed_size < 64) //hit for a compressed line
+                  if(c->sets[line_num].line[0].comp_cl[match_index].compressed_size < 64) //hit for a compressed line
+                  {
                 	  cycle += DCACHE_DECOMPRESSION_LATENCY;
+                	  if(inst_id>sim_inst_count)
+                	  {
+						  if(lru_compute(c,line_num,tag)==1)
+						  {
+							  hit_count_1++;
+							  dontcompress_count++;
+							  hit_rate_1=(double)hit_count_1/(double)(c->stat_read_access+c->stat_write_access);
+							  if(GCP>-THRESHOLD)
+							  GCP-=1;//*((int)(hit_rate_1*10)+1)*1;//(int)((float)DCACHE_DECOMPRESSION_LATENCY/(float)DCACHE_DECOMPRESSION_LATENCY);
+						  }
+						  else
+						  {
+							  //printf("Compression Count for Hit is increasing\n");
+							  compression_count++;
+							  hit_count_2++;
+							  hit_rate_2=(double)hit_count_2/(double)(c->stat_read_access+c->stat_write_access);
+							  GCP+=40;//*((int)(hit_rate_2*10)+1);//(int)((float)DCACHE_MISS_LATENCY/(float)DCACHE_DECOMPRESSION_LATENCY);
+							  if(GCP>THRESHOLD) GCP=THRESHOLD;
+						  }
+                	  }
+                  }
+                  c->sets[line_num].line[0].comp_cl[match_index].last_access_time = cycle;    // update lru time
                   return HIT;
               }
-              else return MISS; // cache block was empty so we don't need to evict cache block
+              else
+              {
+            	  return MISS; // cache block was empty so we don't need to evict cache block
+              }
            }
+    }
+    if(inst_id>sim_inst_count)
+    {
+		  if(c->sets[line_num].line[0].comp_cl[match_index].compressed_size >= 56) //hit for a compressed line
+		  {
+			//printf("Compression Count for Miss is increasing\n");
+			compression_count++;
+			miss_count++;
+			miss_rate=(double)miss_count/(double)(c->stat_read_access+c->stat_write_access);
+			GCP+=40;//*((int)(miss_rate*10)+1);//(int)((float)DCACHE_MISS_LATENCY/(float)DCACHE_DECOMPRESSION_LATENCY);
+			if(GCP>THRESHOLD) GCP=THRESHOLD;
+		  }
     }
   return MISS;     
 }
@@ -254,7 +305,7 @@ uns evict(Cache *c, uns set_index, int num, int count)
    return victim;
 }
 
-int lru_compute(Cache *c, uns set_index, int num)
+int lru_compute(Cache *c, uns set_index, Addr tag)
 {
   int ii;
   uns max_timestamp = c->sets[set_index].line[0].comp_cl[0].last_access_time;
@@ -263,12 +314,11 @@ int lru_compute(Cache *c, uns set_index, int num)
     {
        if(c->sets[set_index].line[0].comp_cl[ii].valid && c->sets[set_index].line[0].comp_cl[ii].last_access_time > max_timestamp)
       {
-
         max_timestamp = c->sets[set_index].line[0].comp_cl[ii].last_access_time;
         max_index = ii;
       }
     }
-    if(c->sets[set_index].line[0].comp_cl[max_index].compressed_size == 8)
+    if(c->sets[set_index].line[0].comp_cl[max_index].tag == tag)
       return 1;
     else
       return 0;
