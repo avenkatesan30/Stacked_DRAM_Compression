@@ -7,7 +7,7 @@
 #define MISS  0
 
 #define MAX_CORES 2
-
+#include <stdbool.h>
 // Precision for PrintStats
 #define UNS_PREC " %8llu"
 #define DBL_PREC "%9.3f"

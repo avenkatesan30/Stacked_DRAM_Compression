@@ -9,6 +9,7 @@ extern uns64 cycle; // You can use this as timestamp for LRU
 #define DCACHE_DECOMPRESSION_LATENCY 5
 #define DCACHE_HIT_LATENCY   42
 #define DCACHE_MISS_LATENCY  200
+#define BYPASS_LEADER_SETS 32
 long long int THRESHOLD = 262000;
 long long int GCP;
 double hit_rate_1=1.0;
@@ -20,6 +21,10 @@ uns64 miss_count=1;
 uns64 sim_inst_count=0;
 uns64 compression_count=0;
 uns64 dontcompress_count=0;
+uint32_t PSEL_bypass = 512;
+bool evict_flag = FALSE;//evict everything has not been called
+
+
 ////////////////////////////////////////////////////////////////////
 // ------------- DO NOT MODIFY THE INIT FUNCTION -----------
 ////////////////////////////////////////////////////////////////////
@@ -72,12 +77,54 @@ void    cache_print_stats    (Cache *c, char *header){
   printf("\n");
 }
 
+bool tag_match(atd a[],Addr tag)
+{
+	 int ii;
+     for(ii=0;ii<5;ii++)
+     {
+    	 if(a[ii].valid && a[ii].tag == tag)
+    	 {
+    		 return TRUE;
+    	 }
+     }
+     return FALSE;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Note: the system provides the cache with the line address
 // Return HIT if access hits in the cache, MISS otherwise 
 // Also if is_write is TRUE, then mark the resident line as dirty
 // Update appropriate stats
 ////////////////////////////////////////////////////////////////////
+void train_bypass_predictor(int category, Cache *c, int line_num, Addr tag)
+{
+     int ii;
+     for(ii=0;ii<5;ii++)
+     {
+    	 if(category == 0)//leader bypass
+    	 {
+    		 if(c->sets[line_num].line[0].bypass_candidates[0].tag == tag)//bypassing is ineffective
+    		 {
+    			 if(PSEL_bypass<1024) PSEL_bypass++;
+    		 }
+    		 else if(tag_match(c->sets[line_num].line[0].eviction_candidates,tag))
+    		 {
+    			 if(PSEL_bypass>0) PSEL_bypass--;
+    		 }
+    	 }
+    	 else
+    	 {
+    		 if(c->sets[line_num].line[0].eviction_candidates[0].tag == tag)//bypassing is ineffective
+    		 {
+    			 if(PSEL_bypass<1024) PSEL_bypass++;
+    		 }
+    		 else if(tag_match(c->sets[line_num].line[0].bypass_candidates,tag))
+    		 {
+    			 if(PSEL_bypass>0) PSEL_bypass--;
+    		 }
+    	 }
+     }
+}
 
 Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   Flag outcome=MISS;
@@ -113,6 +160,8 @@ Flag cache_read(Cache *c, Addr lineaddr)
   int match_index = 0;
   int line_num   = lineaddr % c->num_sets;   /* cache index */
   Addr tag        = (Addr) lineaddr / c->num_sets;   /* cache tag */
+  if(c->sets[line_num].line[0].bypass_category!=2) //Train PSEL only on accesses for leader sets
+  train_bypass_predictor(c->sets[line_num].line[0].bypass_category,c,line_num,tag);
   int cache_cold = FALSE;
   /*if(inst_id>=20000 && inst_id<=20150)
   {
@@ -193,7 +242,22 @@ Flag cache_read(Cache *c, Addr lineaddr)
 // Install the line: determine victim using repl policy (LRU/RAND)
 // copy victim into last_evicted_line for tracking writebacks
 ////////////////////////////////////////////////////////////////////
-
+void bypass(Cache *c,int line_num,int e_index,Addr tag,int comp_data_size,bool flag)
+{
+	if(flag == TRUE)//bypass
+	{
+		c->sets[line_num].line[0].bypass_candidates[0].tag = tag;
+		c->sets[line_num].line[0].bypass_candidates[0].valid = TRUE;
+	}
+	else
+	{
+		c->sets[line_num].line[0].comp_cl[e_index].tag = tag;
+		c->sets[line_num].line[0].comp_cl[e_index].last_access_time   = cycle;
+		c->sets[line_num].line[0].comp_cl[e_index].compressed_size = comp_data_size;
+		c->sets[line_num].line[0].comp_cl[e_index].valid = TRUE;
+		c->sets[line_num].line[0].comp_cl[e_index].dirty = FALSE;  // it should set a dirty bit correctly
+	}
+}
 void cache_install(Cache *c, Addr lineaddr, int comp_data_size, uns is_write, uns core_id)
 {
   //printf("%d",comp_data_size);
@@ -202,6 +266,14 @@ void cache_install(Cache *c, Addr lineaddr, int comp_data_size, uns is_write, un
   Addr tag        = (Addr) lineaddr / c->num_sets;   /* cache tag */
   uns e_index = 0;
   int jj,size = 0;
+  //set duel category for bypass
+    if(line_num % (BYPASS_LEADER_SETS+1) == 0)//Leader set for bypass
+  	  c->sets[line_num].line[0].bypass_category = 0;
+    else if(line_num % (BYPASS_LEADER_SETS-1) == 0)//Leader set for no bypass
+  	  c->sets[line_num].line[0].bypass_category = 1;
+    else
+  	  c->sets[line_num].line[0].bypass_category = 2;
+
   //if incoming cache line's compressed size can be fit in without exceeding the limit - just directly install
     if((comp_data_size + 6) <= line_size - c->sets[line_num].line[0].size_occupied)
     {
@@ -216,22 +288,37 @@ void cache_install(Cache *c, Addr lineaddr, int comp_data_size, uns is_write, un
           }
     }
     else
-       e_index = cache_find_victim(c, line_num, comp_data_size, core_id) ;
+    {
+    	if(c->sets[line_num].line[0].bypass_category == 2 && PSEL_bypass<512)
+    		return;
+    	else
+    		e_index = cache_find_victim(c, line_num, comp_data_size, core_id) ;
+    }
 
-  c->sets[line_num].line[0].comp_cl[e_index].tag = tag;
-  c->sets[line_num].line[0].comp_cl[e_index].last_access_time   = cycle;
-  c->sets[line_num].line[0].comp_cl[e_index].compressed_size = comp_data_size;
-  c->sets[line_num].line[0].comp_cl[e_index].valid = TRUE;
-  c->sets[line_num].line[0].comp_cl[e_index].dirty = FALSE;  // it should set a dirty bit correctly
-
-  for(jj=0;jj<5;jj++)
+  //if bypassed - store incoming tag in bypassed tag
+  //else store incoming line in competitor tag
+  if(c->sets[line_num].line[0].bypass_category == 2)//Follower set
   {
-	  if(c->sets[line_num].line[0].comp_cl[jj].valid)
-	  {
-		 size += c->sets[line_num].line[0].comp_cl[jj].compressed_size + 6;
-	  }
+	  //no bypass - PSEL_bypass>=512
+	 bypass(c,line_num,e_index,tag,comp_data_size,FALSE);
   }
-  c->sets[line_num].line[0].size_occupied = size;
+  else if(c->sets[line_num].line[0].bypass_category == 1) //leader set for no bypass or when decision is no bypass
+  {
+	  bypass(c,line_num,e_index,tag,comp_data_size,FALSE); //no bypass
+	  c->sets[line_num].line[0].eviction_candidates[0].tag = tag;
+	  c->sets[line_num].line[0].eviction_candidates[0].valid = TRUE;
+	  //Updating size occupied
+	  for(jj=0;jj<5;jj++)
+	    {
+	  	  if(c->sets[line_num].line[0].comp_cl[jj].valid)
+	  	  {
+	  		 size += c->sets[line_num].line[0].comp_cl[jj].compressed_size + 6;
+	  	  }
+	    }
+	    c->sets[line_num].line[0].size_occupied = size;
+  }
+  else//leader set for bypass or when decision is bypass
+	  bypass(c,line_num,e_index,tag,comp_data_size,TRUE);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -247,6 +334,13 @@ int compare(const void *a, const void *b)
         return (*x < *y) ? -1 : 0;
 }
 
+void flush_everything(atd a[])
+{
+	int ii;
+	for(ii=0;ii<5;ii++)
+	   a[ii].valid = FALSE;
+}
+
 uns lru_repl(Cache *c, uns replacement_candidates[], int size, uns set_index)
 {
   int ii;
@@ -258,22 +352,71 @@ uns lru_repl(Cache *c, uns replacement_candidates[], int size, uns set_index)
         victim = replacement_candidates[ii];
       }
     }
+    if(c->sets[set_index].line[0].bypass_category == 0)//leader with bypass
+    {
+    	flush_everything((c->sets[set_index].line[0].eviction_candidates));
+    	c->sets[set_index].line[0].eviction_candidates[0].tag = c->sets[set_index].line[0].comp_cl[victim].tag;
+    	c->sets[set_index].line[0].eviction_candidates[0].valid = TRUE;
+    }
+    else if(c->sets[set_index].line[0].bypass_category == 1)//leader no bypass
+    {
+    	flush_everything((c->sets[set_index].line[0].bypass_candidates));
+    	c->sets[set_index].line[0].bypass_candidates[0].tag = c->sets[set_index].line[0].comp_cl[victim].tag;
+    	c->sets[set_index].line[0].bypass_candidates[0].valid = TRUE;
+    }
+    //do nothing for follower
     return victim;
 }
 
 uns evict_everything(Cache *c, uns set_index, int num)//evicts every entry which has comp_data_size >= num
 {
 	uns victim = 0;
+	evict_flag = TRUE; //has been called
 	int ii;
+	int ind = 0;
+
+	/*Invalidation*/
+	if(c->sets[set_index].line[0].bypass_category == 0)
+		flush_everything((c->sets[set_index].line[0].eviction_candidates));
+    else if(c->sets[set_index].line[0].bypass_category == 1)
+    	flush_everything((c->sets[set_index].line[0].bypass_candidates));
+
 	for(ii=0;ii<5;ii++)
 	{
 		if(c->sets[set_index].line[0].comp_cl[ii].valid && c->sets[set_index].line[0].comp_cl[ii].compressed_size >= num)
 		{
+			//before invalidation, check bypass prob
+			//if bypass chosen - don't invalidate, instead store victim tags in competitor tags
+			//else if bypass not chosen - invalidate and
+			if(c->sets[set_index].line[0].bypass_category == 1 || c->sets[set_index].line[0].bypass_category == 2)
 			c->sets[set_index].line[0].comp_cl[ii].valid = 0;
 			victim = ii;
+			if(c->sets[set_index].line[0].bypass_category == 0)//leader bypass
+			{
+				//store tags
+				c->sets[set_index].line[0].eviction_candidates[ind].tag = c->sets[set_index].line[0].comp_cl[victim].tag;
+				c->sets[set_index].line[0].eviction_candidates[ind].valid = TRUE;
+			}
+			else if(c->sets[set_index].line[0].bypass_category == 1)//leader no bypass
+			{
+				c->sets[set_index].line[0].bypass_candidates[ind].tag = c->sets[set_index].line[0].comp_cl[victim].tag;
+			    c->sets[set_index].line[0].bypass_candidates[ind].valid = TRUE;
+			}
+			ind++;
 		}
 	}
 	return victim;
+}
+
+int first_valid_index(atd a[])
+{
+	int ii;
+	for(ii=0;ii<5;ii++)
+	{
+		if(!a[ii].valid)
+			return ii;
+	}
+	return 0;
 }
 
 uns evict(Cache *c, uns set_index, int num, int count)
@@ -281,6 +424,16 @@ uns evict(Cache *c, uns set_index, int num, int count)
    uns victim = 0;
    int ind = 0,ii,jj;
    uns temp_array[5];
+
+   /*Invalidate only when evict everything has not been called before*/
+   if(evict_flag == FALSE)
+   {
+	   if(c->sets[set_index].line[0].bypass_category == 0)
+		   flush_everything(c->sets[set_index].line[0].eviction_candidates);
+	   else if(c->sets[set_index].line[0].bypass_category == 1)
+		   flush_everything(c->sets[set_index].line[0].bypass_candidates);
+   }
+
    for(ii=0;ii<5;ii++)
    {
        if(c->sets[set_index].line[0].comp_cl[ii].valid && c->sets[set_index].line[0].comp_cl[ii].compressed_size == num)
@@ -296,8 +449,23 @@ uns evict(Cache *c, uns set_index, int num, int count)
      {
        if(c->sets[set_index].line[0].comp_cl[jj].last_access_time == temp_array[ii])
        {
+    	 if(c->sets[set_index].line[0].bypass_category == 1 || c->sets[set_index].line[0].bypass_category == 2)
          c->sets[set_index].line[0].comp_cl[jj].valid = 0;
          victim = jj;
+         if(c->sets[set_index].line[0].bypass_category == 0)//leader bypass
+         {
+        	 //store tags
+        	 ind = first_valid_index(c->sets[set_index].line[0].eviction_candidates);
+        	 c->sets[set_index].line[0].eviction_candidates[ind].tag = c->sets[set_index].line[0].comp_cl[victim].tag;
+        	 c->sets[set_index].line[0].eviction_candidates[ind].valid = TRUE;
+         }
+         else if(c->sets[set_index].line[0].bypass_category == 1)//leader no bypass
+         {
+        	 ind = first_valid_index(c->sets[set_index].line[0].bypass_candidates);
+        	 c->sets[set_index].line[0].bypass_candidates[ind].tag = c->sets[set_index].line[0].comp_cl[victim].tag;
+        	 c->sets[set_index].line[0].bypass_candidates[ind].valid = TRUE;
+         }
+         ind++;
          break;
        }
      }
@@ -461,12 +629,12 @@ uns cache_find_victim(Cache *c, uns set_index, int comp_data_size, uns core_id)
   {
 	//printf("\nCalling comb victim");
     //OLD CODE//
+	  evict_flag = FALSE;
 	  victim = get_comb_victim(c,comp_data_size,set_index);
     ///////////
 	  //uns temp_arr[5]={0,1,2,3,4};
 	    //victim = lru_repl(c, temp_arr, 5, set_index);
 	    //printf("%d\n",victim);
-	 
   }
   else
   {

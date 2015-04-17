@@ -13,7 +13,11 @@ typedef struct Cache Cache;
 
 //////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////
-
+typedef struct ATD
+{
+    Addr tag;
+	bool valid;
+}atd;
 
 typedef struct Cache_Line {
     Flag    valid;
@@ -30,6 +34,9 @@ typedef struct Big_cache_line {
 	cache_line comp_cl[5];
 	//int num_occupied_slots;
 	int size_occupied;
+	atd eviction_candidates[5];
+	atd bypass_candidates[5];
+	int bypass_category; // 0 for bypass, 1 for no bypass, 2 for follower
 }big_cache_line;
 
 struct Cache_Set {
